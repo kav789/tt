@@ -4,6 +4,7 @@
 %%%-------------------------------------------------------------------
 
 -module(tt_filter_wrk).
+-include_lib("eunit/include/eunit.hrl").
 -behaviour ( gen_server ).
 -define(SERVER, ?MODULE).
 -export([start_link/0,  stop/1]).
@@ -60,6 +61,7 @@ terminate(_R, _S) -> ok.
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
+isprime(N) when N =< 1 -> false;
 isprime(N) when N == 2 -> true;
 isprime(N) when N == 3 -> true;
 isprime(N) when N rem 2 == 0 -> false;
@@ -71,3 +73,14 @@ isprime(N,I, _) when N rem (I + 1) == 0 -> false;
 isprime(N,I, _) when N rem (I - 1) == 0 -> false;
 isprime(N,I,I2) -> isprime(N,I+6,I2).
 
+
+
+
+isprime_test_() -> [
+	?_assert(isprime(0) =:= false),
+	?_assert(isprime(7) =:= true),
+	?_assert(isprime(2147483647) =:= true),
+	?_assert(isprime(600) =:= false),
+	?_assert(isprime(4) =:= false),
+	?_assert(isprime(5) =:= true)
+	].
