@@ -11,7 +11,7 @@
 -define(SERVER, ?MODULE).
 -export([start_link/0, start/0, stop/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
--record(state, {rsk,qk,rc}).
+-record(state, {rsk,qk,rc,rcw,chc,to}).
 
 start_link() ->
 	gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
@@ -29,39 +29,85 @@ init([]) ->
 	{ok,Rdb}   = application:get_env(App,confRedisDB),
 	{ok,Qk}    = application:get_env(App,confQueueKey),
 	{ok,Rsk}   = application:get_env(App,confResultSetKey),
+	process_flag(trap_exit, true),
 	{ok,Rc}    = eredis:start_link(Rhost,Rport,Rdb),
-	S = #state{ qk = Qk,  rsk = Rsk, rc = Rc },
-	{ok, S, 0}.
+	{ok,Rcw}   = eredis:start_link(Rhost,Rport,Rdb),
+	{ok, #state{ qk = Qk,  rsk = Rsk, rc = Rc, rcw = Rcw, chc = 0,to = 0 }, 0}.
 
 handle_call(stop, _F, S) ->
-	eredis_client:stop(S#state.rc),
-	{stop, normal, ok, S};
+	if
+		S#state.chc == 0 ->
+			eredis_client:stop(S#state.rc),
+			eredis_client:stop(S#state.rcw),
+			{stop, normal, ok, S};
+		true ->
+			{noreply, S#state{to = infinity},infinity}
+	end;
 handle_call(_M, _F, S) ->
-	{noreply, S, 0}.
+	{noreply, S, S#state.to}.
 
 handle_cast(_M, S) ->
-	{noreply, S, 0}.
+	{noreply, S, S#state.to}.
 
 handle_info(timeout, S) ->
 	try
 		{ok,Ret} = eredis:q(S#state.rc, ["BLPOP", S#state.qk, 1]),
 		if
 			Ret /= undefined ->
-			N = list_to_integer(binary_to_list(lists:nth(2,Ret))),
-			spawn_link( fun() -> isprime(N) andalso  (?MODULE ! {primetest,N,true}) end );
-			true -> ok
+				N = list_to_integer(binary_to_list(lists:nth(2,Ret))),
+				spawn_link( fun() -> isprime(N) andalso  ( {ok,_} = eredis:q(S#state.rcw, ["SADD",S#state.rsk, N]) ) end ),
+				{noreply, S#state{chc = S#state.chc + 1}, S#state.to};
+			true ->
+				{noreply, S, S#state.to}
 		end
 	catch
-		exit:{timeout, _} -> ok
+		exit:{timeout, _} ->
+			{noreply, S, S#state.to}
+	end;
+handle_info({'EXIT',Pid,_}, S) ->
+	Chc =
+	if
+		(Pid /= S#state.rc) and (Pid /= S#state.rcw) ->
+			S#state.chc - 1;
+		true ->
+			S#state.chc
 	end,
-	{noreply, S, 0};
-handle_info({primetest, N, true}, S) ->
-	{ok,_} = eredis:q(S#state.rc, ["SADD",S#state.rsk, N]),
-	{noreply, S, 0};
+	if
+		(S#state.to =:= infinity ) and ( Chc == 0) ->
+			eredis_client:stop(S#state.rc),
+			eredis_client:stop(S#state.rcw),
+			{stop,normal, S};
+		true ->
+			{noreply, S#state{chc = Chc}, S#state.to}
+	end;
 handle_info(_M, S) ->
-	{noreply, S, 0}.
+	{noreply, S, S#state.to}.
 
-terminate(_R, _S) -> ok.
+terminate(R, S) ->
+	if
+		S#state.chc > 0 ->
+			Chc =
+			receive
+				{'EXIT',Pid,_} ->
+					if
+						(Pid /= S#state.rc) and (Pid /= S#state.rcw) ->
+							S#state.chc - 1;
+						true ->
+							S#state.chc
+					end
+			end,
+			if
+				Chc == 0  ->
+					eredis_client:stop(S#state.rc),
+					eredis_client:stop(S#state.rcw),
+					ok;
+				true ->
+					terminate(R,S#state{chc = Chc })
+			end;
+		true -> ok
+	end.
+
+
 
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.

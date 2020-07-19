@@ -96,9 +96,14 @@ test_speed(Config) ->
 	{ok,Bval} = eredis:q(Rc, ["LLEN", Qk]),
 	Val1 = list_to_integer(binary_to_list(Bval)),
 	{Val2,T} = test_speed(Rc,Qk),
-	Sp = (Val1 - Val2)/T,
-	Lim = ?config(lim, Config),
-	io:format("filter speed: ~p for Lim ~p ~n", [Sp,Lim]),
+	if 
+		T > 0 ->
+			Sp = (Val1 - Val2)/T,
+			Lim = ?config(lim, Config),
+			io:format("filter speed: ~p for Lim ~p ~n", [Sp,Lim]);
+		true -> 
+			io:format("filter speed: increase RandCount ~n", [])
+	end,
 	process_flag(trap_exit, true),
 	tt_filter_wrk:stop(Pid),
 	receive {'EXIT',Pid,_} -> ok end,
@@ -111,7 +116,8 @@ test_speed(Rc,Qk,Pval,T) ->
 	{ok,Bval} = eredis:q(Rc, ["LLEN", Qk]),
 	Val = list_to_integer(binary_to_list(Bval)),
 	if
-		Val == 0 -> {Pval,T};
+		Val == 0 -> 
+				{Pval,T};
 		true -> test_speed(Rc,Qk,Val,T+1)
 	end.
 
@@ -133,4 +139,3 @@ test_result(Rc,Rs,Pr) ->
 			test_result(Rc,Rs,Pr2);
 		true -> Pr
 	end.
-
