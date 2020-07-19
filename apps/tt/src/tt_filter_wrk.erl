@@ -4,21 +4,26 @@
 %%%-------------------------------------------------------------------
 
 -module(tt_filter_wrk).
+-ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
+-endif.
 -behaviour ( gen_server ).
 -define(SERVER, ?MODULE).
--export([start_link/0,  stop/1]).
+-export([start_link/0, start/0, stop/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 -record(state, {rsk,qk,rc}).
 
 start_link() ->
 	gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
+start() ->
+	gen_server:start({local, ?SERVER}, ?MODULE, [], []).
+
 stop(Pid) ->
 	gen_server:call(Pid, stop).
 
 init([]) ->
-	{ok,App}   = application:get_application(),
+	{ok,App}   = tt_lib:get_application(),
 	{ok,Rhost} = application:get_env(App,confRedisHost),
 	{ok,Rport} = application:get_env(App,confRedisPort),
 	{ok,Rdb}   = application:get_env(App,confRedisDB),
@@ -73,8 +78,7 @@ isprime(N,I, _) when N rem (I + 1) == 0 -> false;
 isprime(N,I, _) when N rem (I - 1) == 0 -> false;
 isprime(N,I,I2) -> isprime(N,I+6,I2).
 
-
-
+-ifdef(TEST).
 
 isprime_test_() -> [
 	?_assert(isprime(0) =:= false),
@@ -82,5 +86,11 @@ isprime_test_() -> [
 	?_assert(isprime(2147483647) =:= true),
 	?_assert(isprime(600) =:= false),
 	?_assert(isprime(4) =:= false),
-	?_assert(isprime(5) =:= true)
+	?_assert(isprime(5) =:= true),
+	?_assert(isprime(922483585259) =:= true),
+	?_assert(isprime(828737779087) =:= true),
+	?_assert(isprime(733880908597) =:= true)
+
 	].
+
+-endif.

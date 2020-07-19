@@ -12,3 +12,8 @@ Eunit tests
 -----------
 
     $ rebar3 eunit
+
+Common test
+-----------
+
+    $ rebar3 ct
