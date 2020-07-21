@@ -5,6 +5,6 @@ get_application() ->
 	App = application:get_application(),
 	
 	if
-		App == undefined -> {ok,test};
+		App =:= undefined -> {ok,test};
 		true -> App
 	end.

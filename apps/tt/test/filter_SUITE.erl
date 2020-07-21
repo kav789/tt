@@ -8,7 +8,7 @@
 -define(RandLimit2, 1000000000000).
 -define(RandLimit3, 10000000000000).
 
--define(RandCount, 50000).
+-define(RandCount, 15000).
 
 all() -> [filter_test1,filter_test2,filter_test3].
 
@@ -34,9 +34,9 @@ init_per_testcase(Case, Config) ->
 	Rs = ?config(rs, Config),
 	{ok,_} = eredis:q(Rc, ["DEL", Rs]),
 	Lim = if 
-		Case == filter_test1 -> ?RandLimit1;
-		Case == filter_test2 -> ?RandLimit2;
-		Case == filter_test3 -> ?RandLimit3;
+		Case =:= filter_test1 -> ?RandLimit1;
+		Case =:= filter_test2 -> ?RandLimit2;
+		Case =:= filter_test3 -> ?RandLimit3;
 		true                 -> 3
 	end,
 	Pr = fillrand(?RandCount,Rc,Qk,Lim),
@@ -132,7 +132,7 @@ test_result(Config) ->
 test_result(Rc,Rs,Pr) ->
 	{ok,Bval} = eredis:q(Rc, ["SPOP", Rs]),
 	if
-		Bval /= undefined ->
+		Bval =/= undefined ->
 			Val1 = list_to_integer(binary_to_list(Bval)),
 			Pr2 = lists:delete(Val1,Pr),
 			?assert(length(Pr) > length(Pr2)),

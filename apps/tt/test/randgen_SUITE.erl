@@ -6,11 +6,11 @@
 
 -define(TestPeriod1, 1000).
 -define(TestCount1,  30).
--define(MaxDisp1,    4.0).
+-define(MaxDisp1,    10.0).
 
 -define(TestPeriod2, 50).
 -define(TestCount2,  200).
--define(MaxDisp2,    5.0).
+-define(MaxDisp2,    8.0).
 
 
 all() -> [randgen_speed1, randgen_speed2].

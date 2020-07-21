@@ -37,8 +37,6 @@ init([]) ->
 handle_call(stop, _F, S) ->
 	if
 		S#state.chc == 0 ->
-			eredis_client:stop(S#state.rc),
-			eredis_client:stop(S#state.rcw),
 			{stop, normal, ok, S};
 		true ->
 			{noreply, S#state{to = infinity},infinity}
@@ -53,7 +51,7 @@ handle_info(timeout, S) ->
 	try
 		{ok,Ret} = eredis:q(S#state.rc, ["BLPOP", S#state.qk, 1]),
 		if
-			Ret /= undefined ->
+			Ret =/= undefined ->
 				N = list_to_integer(binary_to_list(lists:nth(2,Ret))),
 				spawn_link( fun() -> isprime(N) andalso  ( {ok,_} = eredis:q(S#state.rcw, ["SADD",S#state.rsk, N]) ) end ),
 				{noreply, S#state{chc = S#state.chc + 1}, S#state.to};
@@ -67,15 +65,13 @@ handle_info(timeout, S) ->
 handle_info({'EXIT',Pid,_}, S) ->
 	Chc =
 	if
-		(Pid /= S#state.rc) and (Pid /= S#state.rcw) ->
+		(Pid =/= S#state.rc) and (Pid =/= S#state.rcw) ->
 			S#state.chc - 1;
 		true ->
 			S#state.chc
 	end,
 	if
 		(S#state.to =:= infinity ) and ( Chc == 0) ->
-			eredis_client:stop(S#state.rc),
-			eredis_client:stop(S#state.rcw),
 			{stop,normal, S};
 		true ->
 			{noreply, S#state{chc = Chc}, S#state.to}
@@ -84,27 +80,26 @@ handle_info(_M, S) ->
 	{noreply, S, S#state.to}.
 
 terminate(R, S) ->
+	eredis_client:stop(S#state.rc),
+	wterminate(R,S).
+
+
+wterminate(R,S) ->
+%	io:format("terminate ~p ~p ~p ~n", [S#state.chc,is_process_alive(S#state.rc),is_process_alive(S#state.rcw)]),
 	if
 		S#state.chc > 0 ->
-			Chc =
 			receive
 				{'EXIT',Pid,_} ->
 					if
-						(Pid /= S#state.rc) and (Pid /= S#state.rcw) ->
-							S#state.chc - 1;
+						(Pid =/= S#state.rc) and (Pid =/= S#state.rcw) ->
+							wterminate(R,S#state{chc = S#state.chc -1 });
 						true ->
-							S#state.chc
+							wterminate(R,S)
 					end
-			end,
-			if
-				Chc == 0  ->
-					eredis_client:stop(S#state.rc),
-					eredis_client:stop(S#state.rcw),
-					ok;
-				true ->
-					terminate(R,S#state{chc = Chc })
 			end;
-		true -> ok
+		true ->
+			eredis_client:stop(S#state.rcw),
+			ok
 	end.
 
 
@@ -135,7 +130,8 @@ isprime_test_() -> [
 	?_assert(isprime(5) =:= true),
 	?_assert(isprime(922483585259) =:= true),
 	?_assert(isprime(828737779087) =:= true),
-	?_assert(isprime(733880908597) =:= true)
+	?_assert(isprime(733880908597) =:= true),
+	?_assert(isprime(733880908598) =:= false)
 
 	].
 
