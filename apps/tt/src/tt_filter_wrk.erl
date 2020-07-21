@@ -85,7 +85,6 @@ terminate(R, S) ->
 
 
 wterminate(R,S) ->
-%	io:format("terminate ~p ~p ~p ~n", [S#state.chc,is_process_alive(S#state.rc),is_process_alive(S#state.rcw)]),
 	if
 		S#state.chc > 0 ->
 			receive
